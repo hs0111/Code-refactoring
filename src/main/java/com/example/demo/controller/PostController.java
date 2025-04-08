@@ -2,13 +2,16 @@
 
 package com.example.demo.controller;
 
-import com.example.demo.dto.PostDTO;
+import com.example.demo.dto.PostRequestDTO;
+import com.example.demo.dto.PostResponseDTO;
 import com.example.demo.entity.PostEntity;
 import com.example.demo.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/users")
@@ -32,17 +35,26 @@ public class PostController {
     // 3. 일관된 응답 형식 유지
 
     @PostMapping     // 제네릭 와일드카드 (어떤 타입이드 올 수 있음)
-    public ResponseEntity<?> createUser(@RequestBody PostDTO postDTO) {
+    public ResponseEntity<?> createUser(@RequestBody PostRequestDTO requestDTO) {
         // 클라이언트가 회원 가입 정보를 담은 JSON 데이터를 보내면 @RequestBody PostDTO로 빋음
         try {
-            PostEntity createdUser = postService.createUser(postDTO);
+            PostEntity createdUser = postService.createUser(requestDTO);
             // 회원가입 성공 시, 200 OK 응답과 함께 생성된 객체 반환
-            return ResponseEntity.ok(createdUser);
+            PostResponseDTO responseDTO = PostResponseDTO.builder()
+                    //DTO 객체를 생성할 때 생성자 호출 방식보다 빌더 패턴을 사용하면 필드의 순서를 사용하지 않고
+                    //명시적으로 각 필드의 값을 설정할 수 있어 코드 가독성이 높아짐
+                    .id(createdUser.getId())
+                    .name(createdUser.getName())
+                    .email(createdUser.getEmail())
+                    .build();
+                    // 어떤 값이 어떤 필드에 들어가는지 쉽개 파악 ㄱㄴ
+
+            return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
-            // 예외 발생 시, 400 Bad Request와 에러 메시지 반환
             return ResponseEntity.badRequest().body(e.getMessage());
         }
-        // try/catch 블록을 사용해 예외 발생 시 적절한 에러 메시지를 반환
+        // try/catch 블록을 사용해 예외 발생 시 적절한 에러 메시지를 반환 (클라이언트는 무엇이 잘못되었는지 알 수 있음)
+
     }
 
     // 모든 회원 조회
@@ -55,23 +67,34 @@ public class PostController {
 
     // 특정 회원 조회
     @GetMapping("/{id}")
-    public ResponseEntity<postEntity> getUser(@PathVariable Long id) {
-        // URL 경로의 {id} 부분을 @PathVariable로 받음 -> 특정 회원 정보 조회
+    public ResponseEntity<?> getUserById(@PathVariable Long id) {
         try {
-            PostEntity user = postService.getUserById(id);
-            return ResponseEntity.ok(user);
+            PostEntity entity = postService.getUserById(id);
+            // 엔티티 -> ResponseDTO 변환
+            PostResponseDTO responseDTO = PostResponseDTO.builder()
+                    .id(entity.getId())
+                    .name(entity.getName())
+                    .email(entity.getEmail())
+                    .build();
+            return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
-        } // 조회 실패하면 예외 발생 -> catch 블록에서 에러 메세지 반환
+        }
     }
+
 
     // 회원 정보 수정
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody PostDTO postDTO) {
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody PostRequestDTO requestDTO) {
         // URL의 {id}와 수정할 데이터를 JSON 형태의 PostDTO로 받아 해당 회원 정보를 수정
         try {
-            PostEntity updatedUser = postService.updateUser(id, postDTO);
-            return ResponseEntity.ok(updatedUser);
+            PostEntity updatedUser = postService.updateUser(id, requestDTO);
+            PostResponseDTO responseDTO = PostResponseDTO.builder()
+                    .id(updatedUser.getId())
+                    .name(updatedUser.getName())
+                    .email(updatedUser.getEmail())
+                    .build();
+            return ResponseEntity.ok(responseDTO);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -89,7 +112,6 @@ public class PostController {
     }
 }
 
-}
 
 // ResponseEntity 활용 ; 메서드에서 성공 및 실패 상채에 따라 HTTP 상태 코드(200, 400등)
 // 명확하게 반환하기 때문에 API사용자가 음답 상태를 쉽게 파악함
